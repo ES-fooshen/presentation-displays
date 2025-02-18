@@ -4,7 +4,14 @@
 
 Flutter plugin supports to run on two screens. It's basically a tablet connected to another screen via an HDMI or Wireless
 
-#### Plugin: [https://pub.dev/packages/presentation_displays](https://pub.dev/packages/presentation_displays)
+ add in pubspec.yaml
+ ```yaml
+  presentation_displays: 
+    git:
+      url: https://github.com/SHEBINKUNIYIL/presentation-displays.git
+      ref: master
+```
+
 
 Idea: We create a `Widget` by using Flutter code and pass it to Native code side then convert it to` FlutterEngine` and save it to `FlutterEngineCache` for later use.
 
