@@ -111,6 +111,15 @@ class PresentationDisplaysPlugin : FlutterPlugin, ActivityAware, MethodChannel.M
           result.success(false)
         }
       }
+      "setSecondaryDisplayFocusable" -> {
+        try {
+          val focusable = call.arguments as Boolean
+          presentation?.setWindowFocusable(focusable)
+          result.success(presentation != null)
+        } catch (e: Exception) {
+          result.error(call.method, e.message, null)
+        }
+      }
     }
   }
 

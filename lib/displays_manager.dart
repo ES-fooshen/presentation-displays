@@ -11,6 +11,7 @@ const _listDisplay = "listDisplay";
 const _showPresentation = "showPresentation";
 const _hidePresentation = "hidePresentation";
 const _transferDataToPresentation = "transferDataToPresentation";
+const _setSecondaryDisplayFocusable = "setSecondaryDisplayFocusable";
 
 /// Display category: secondary display.
 /// <p>
@@ -195,6 +196,23 @@ class DisplayManager {
   Future<bool?>? transferDataToPresentation(dynamic arguments) async {
     return await _displayMethodChannel?.invokeMethod<bool?>(
         _transferDataToPresentation, arguments);
+  }
+
+  /// Controls whether the secondary display window may take Android key input focus.
+  /// <p>
+  /// The secondary display window is created non-focusable so that hardware
+  /// key input (e.g. HID barcode scanners) keeps routing to the main activity
+  /// window even when the secondary screen is touched. A non-focusable window
+  /// still receives touch events.
+  /// Pass [focusable] as true only while the secondary display needs key input
+  /// (e.g. a text field with the soft keyboard), then restore it to false.
+  /// </p>
+  ///
+  /// return [Future<bool>] true when the flag was applied to a currently shown
+  /// secondary display, false when no secondary display is showing
+  Future<bool?>? setSecondaryDisplayFocusable(bool focusable) async {
+    return await _displayMethodChannel?.invokeMethod<bool?>(
+        _setSecondaryDisplayFocusable, focusable);
   }
 
   /// Subscribe to the stream to get notifications about connected / disconnected displays
