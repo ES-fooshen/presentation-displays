@@ -14,6 +14,8 @@ import io.flutter.embedding.engine.FlutterEngineCache
 class PresentationDisplay(context: Context, private val tag: String, display: Display) :
     Presentation(context, display) {
 
+    private var isWindowFocusable = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -21,6 +23,7 @@ class PresentationDisplay(context: Context, private val tag: String, display: Di
         // activity window. A non-focusable window still receives touch events,
         // but never takes Android key input focus when touched. Call
         // setWindowFocusable(true) only while this display needs the soft keyboard.
+        isWindowFocusable = false
         window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
 
         val flContainer = FrameLayout(context)
@@ -43,6 +46,12 @@ class PresentationDisplay(context: Context, private val tag: String, display: Di
     }
 
     fun setWindowFocusable(focusable: Boolean) {
+        // Skip no-op calls: Window.setFlags triggers a window relayout even
+        // when the flags are unchanged, and this is called on every data push.
+        if (focusable == isWindowFocusable) {
+            return
+        }
+        isWindowFocusable = focusable
         if (focusable) {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         } else {
