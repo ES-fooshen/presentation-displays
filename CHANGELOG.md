@@ -1,3 +1,21 @@
+## 1.1.0
+
+* Requires Flutter 3.44 and Dart 3.12.
+* Updates Android to AGP 9.0.1, Gradle 9.1, compile SDK 36, Java 17, and Kotlin JVM 17.
+* Migrates the Android library away from directly applying the Kotlin Android plugin.
+* Adds an Android namespace and removes legacy support-library dependencies.
+* Adds additive secondary-to-main data transfer and listener APIs on Android.
+* Preserves the existing main-to-secondary channel and `SecondaryDisplay` API.
+* Preserves non-focusable presentation windows and explicit focus control for HID scanner routing.
+* Cleans up Flutter views, channels, presentations, display listeners, and owned Flutter engines.
+* Restores an active presentation after Android activity configuration changes.
+* Dismisses an active presentation when its physical display disconnects.
+* Prevents duplicate presentation windows and reports inactive operations accurately.
+* Fixes the out-of-range boundary check in `getNameByIndex`.
+* Replaces the placeholder test with MethodChannel contract coverage.
+* Updates the bundled example for current Flutter Android and iOS project requirements.
+* Excludes legacy demo and generated files from the published package.
+
 ## 1.0.0
 * Able to package android release build. Works fine in example app.
 

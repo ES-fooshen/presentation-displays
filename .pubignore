@@ -1,0 +1,10 @@
+.dart_tool/
+.github/
+.idea/
+.vscode/
+build/
+example/.dart_tool/
+example/build/
+example/ios/Flutter/ephemeral/
+*.iml
+Sequence_small.gif

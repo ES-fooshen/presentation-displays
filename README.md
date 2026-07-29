@@ -1,76 +1,126 @@
 # presentation_displays
 
-#### Supported mobile platforms iOS and Android
+Flutter plugin for rendering Flutter UI on a connected secondary display.
 
-Flutter plugin supports to run on two screens. It's basically a tablet connected to another screen via an HDMI or Wireless
+## Features
 
- add in pubspec.yaml
- ```yaml
-  presentation_displays: 
-    git:
-      url: https://github.com/SHEBINKUNIYIL/presentation-displays.git
-      ref: master
-```
+- Lists connected displays and reports display connection changes.
+- Shows and hides a Flutter route on a secondary display.
+- Transfers data from the main Flutter engine to the secondary engine.
+- Transfers data from the secondary Flutter engine back to the main engine on Android.
+- Keeps Android presentation windows non-focusable for HID scanner routing, with an
+  explicit API for temporary keyboard focus.
+- Supports Android presentations and the existing iOS external-display implementation.
 
+## Requirements
 
-Idea: We create a `Widget` by using Flutter code and pass it to Native code side then convert it to` FlutterEngine` and save it to `FlutterEngineCache` for later use.
+- Dart 3.12 or later.
+- Flutter 3.44 or later.
+- Android API 21 or later.
 
-Next, we define the Display by using displayId and we will define the UI flutter that needs to display by grabbing `FlutterEngine` in `FlutterEngineCache` and transferring it to Dialog `Presentation` as a View.
+## Setup
 
-We provide methods to get a list of connected devices and the information of each device then transfer data from the main display to the secondary display.
-
-Simple steps:
-
-- Create Widgets that need to display and define them as a permanent router when you configure the router in the Flutter code.
-
-- Get the Displays list by calling `displayManager.getDisplays ()`
-
-- Define which Display needs to display
-For instance: `displays [1] .displayId` Display the index 2.
-
-- Display it on Display with your routerName as `presentation` `displayManager.showSecondaryDisplay (displayId: displays [1] .displayId, routerName: "presentation") `
-
-- Transmit the data from the main display to the secondary display by `displayManager.transferDataToPresentation (" test transfer data ")`
-- The secondary screen receives data
+Define a secondary Dart entry point. The plugin uses the route passed to
+`showSecondaryDisplay` as the secondary engine's initial route.
 
 ```dart
-@override
-Widget build (BuildContext context) {
-    return SecondaryDisplay (
-        callback: (argument) {
-        setState (() {
-        value = argument;
-        });
-    }
-    );
+void main() {
+  runApp(const MainApp());
 }
-```
-- wesetup new entry point for secondary display so we can decided what we need to call for initialization. Works only for android for now
-```dart
+
 @pragma('vm:entry-point')
 void secondaryDisplayMain() {
- /// do something that don't break plugin registration here.
+  runApp(const SecondaryApp());
 }
 ```
-### Upgrade version 1.0.0
 
-- Able to package android release build. Works fine in example app.
+## Show A Secondary Display
 
-- Tested example app in android tab and ios tab and things work as expected. Ensure the devices have USB C 3.0 and above else HDMI out is not supported.
+```dart
+final DisplayManager displayManager = DisplayManager();
+final List<Display> displays = await displayManager.getDisplays() ?? <Display>[];
 
-- In case of iOS, please refer to example app app delegate. There are few lines of code which needs to be added to your app's app delegate as well for this to work fine in iOS.
+if (displays.length > 1) {
+  await displayManager.showSecondaryDisplay(
+    displayId: displays.last.displayId!,
+    routerName: '/presentation',
+  );
+}
+```
 
-- Updated optional issues and null checks
+## Main To Secondary Data
 
-- Added option to hide second display from the first
+Send data from the main Flutter engine:
 
-- WIP support second main in iOS for extended display
+```dart
+await displayManager.transferDataToPresentation(<String, dynamic>{
+  'total': 42.00,
+});
+```
 
-- WIP Send data back from 2nd to 1st display
+Receive it in the secondary Flutter engine:
 
-You can take a look at our example to learn more about how the plugin works
+```dart
+SecondaryDisplay(
+  callback: (dynamic data) {
+    // Update the secondary display.
+  },
+  child: const PresentationView(),
+);
+```
 
-#### Test on Sunmi-D2 device
+## Secondary To Main Data
 
-![The example app running in android](https://github.com/VNAPNIC/presentation-displays/blob/master/Sequence_small.gif?raw=true)
+Register the listener in the main Flutter engine:
 
+```dart
+displayManager.listenDataFromPresentationDisplay((dynamic data) {
+  // Handle input from the secondary display.
+});
+```
+
+Send data from the secondary Flutter engine:
+
+```dart
+await DisplayManager().transferDataToMain(<String, dynamic>{
+  'customerName': 'Customer',
+});
+```
+
+Remove the main-engine listener when it is no longer needed:
+
+```dart
+displayManager.removeDataFromPresentationDisplayListener();
+```
+
+Secondary-to-main transfer is currently implemented on Android. The existing iOS
+implementation remains one-way.
+
+## Android Focus Control
+
+Android presentation windows start non-focusable so touching the secondary display
+does not redirect HID barcode scanner input away from the main activity.
+
+Enable focus only while the secondary display needs keyboard input:
+
+```dart
+await displayManager.setSecondaryDisplayFocusable(true);
+```
+
+Restore scanner routing to the main display when input completes:
+
+```dart
+await displayManager.setSecondaryDisplayFocusable(false);
+```
+
+The secondary display still receives touch events while non-focusable.
+
+## Display Events
+
+```dart
+displayManager.connectedDisplaysChangedStream?.listen((int? event) {
+  // 1 means a display was connected; 0 means a display was disconnected.
+});
+```
+
+See the bundled example for a complete two-way Android presentation flow.

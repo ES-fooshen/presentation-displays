@@ -4,15 +4,17 @@ import 'package:presentation_displays/displays_manager.dart';
 
 /// Only use a subscription to listen within the secondary display
 /// [arguments] returned  type [dynamic]
-typedef ArgumentsCallback = Function(dynamic arguments);
+typedef ArgumentsCallback = void Function(dynamic arguments);
 
 /// This widget will wrap the secondary display, it will receive data transmitted from [DisplayManager].
 /// [SecondaryDisplay.callback] instance of [ArgumentsCallback] to receive data transmitted from the [DisplayManager].
 /// [SecondaryDisplay.child] child widget of secondary display
 class SecondaryDisplay extends StatefulWidget {
-  const SecondaryDisplay(
-      {Key? key, required this.callback, required this.child})
-      : super(key: key);
+  const SecondaryDisplay({
+    super.key,
+    required this.callback,
+    required this.child,
+  });
 
   /// instance of [ArgumentsCallback] to receive data transmitted from the [DisplaysManager].
   final ArgumentsCallback callback;
@@ -21,7 +23,7 @@ class SecondaryDisplay extends StatefulWidget {
   final Widget child;
 
   @override
-  _SecondaryDisplayState createState() => _SecondaryDisplayState();
+  State<SecondaryDisplay> createState() => _SecondaryDisplayState();
 }
 
 class _SecondaryDisplayState extends State<SecondaryDisplay> {
@@ -39,7 +41,14 @@ class _SecondaryDisplayState extends State<SecondaryDisplay> {
     return widget.child;
   }
 
-  _addListenerForPresentation(ArgumentsCallback function) {
+  @override
+  void dispose() {
+    _presentationMethodChannel?.setMethodCallHandler(null);
+    _presentationMethodChannel = null;
+    super.dispose();
+  }
+
+  void _addListenerForPresentation(ArgumentsCallback function) {
     _presentationMethodChannel = MethodChannel(_presentationChannel);
     _presentationMethodChannel?.setMethodCallHandler((call) async {
       function(call.arguments);

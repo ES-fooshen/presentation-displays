@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -11,7 +13,11 @@ const _listDisplay = "listDisplay";
 const _showPresentation = "showPresentation";
 const _hidePresentation = "hidePresentation";
 const _transferDataToPresentation = "transferDataToPresentation";
+const _transferDataToMain = "transferDataToMain";
 const _setSecondaryDisplayFocusable = "setSecondaryDisplayFocusable";
+const _dataTransfer = "DataTransfer";
+
+typedef PresentationDataCallback = void Function(dynamic arguments);
 
 /// Display category: secondary display.
 /// <p>
@@ -36,13 +42,16 @@ const String DISPLAY_CATEGORY_PRESENTATION =
 class DisplayManager {
   final _displayMethodChannelId = "presentation_displays_plugin";
   final _displayEventChannelId = "presentation_displays_plugin_events";
+  final _dataToMainMethodChannelId = "presentation_displays_plugin_to_main";
 
   late MethodChannel? _displayMethodChannel;
   late EventChannel? _displayEventChannel;
+  late MethodChannel? _dataToMainMethodChannel;
 
   DisplayManager() {
     _displayMethodChannel = MethodChannel(_displayMethodChannelId);
     _displayEventChannel = EventChannel(_displayEventChannelId);
+    _dataToMainMethodChannel = MethodChannel(_dataToMainMethodChannelId);
   }
 
   /// Gets all currently valid logical displays of the specified category.
@@ -60,15 +69,21 @@ class DisplayManager {
   ///
   /// See [DISPLAY_CATEGORY_PRESENTATION]
   Future<List<Display>?> getDisplays({String? category}) async {
-    List<dynamic> origins = await jsonDecode((await _displayMethodChannel
-            ?.invokeMethod(_listDisplay, category))) ??
-        [];
-    List<Display> displays = [];
-    for (var element in origins) {
-      final map = jsonDecode(jsonEncode(element));
-      displays.add(kReleaseMode
-          ? displayReleaseFromJson(map as Map<String, dynamic>)
-          : displayFromJson(map as Map<String, dynamic>));
+    final String? encodedDisplays = await _displayMethodChannel
+        ?.invokeMethod<String>(_listDisplay, category);
+    if (encodedDisplays == null) {
+      return <Display>[];
+    }
+
+    final List<dynamic> origins = jsonDecode(encodedDisplays) as List<dynamic>;
+    final List<Display> displays = <Display>[];
+    for (final dynamic element in origins) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(
+        element as Map<dynamic, dynamic>,
+      );
+      displays.add(
+        kReleaseMode ? displayReleaseFromJson(map) : displayFromJson(map),
+      );
     }
     return displays;
   }
@@ -104,7 +119,7 @@ class DisplayManager {
   Future<String?> getNameByIndex(int index, {String? category}) async {
     List<Display> displays = await getDisplays(category: category) ?? [];
     String? name;
-    if (index >= 0 && index <= displays.length) name = displays[index].name;
+    if (index >= 0 && index < displays.length) name = displays[index].name;
     return name;
   }
 
@@ -117,14 +132,17 @@ class DisplayManager {
   /// </P>
   ///
   /// return [Future<bool>] about the status has been display or not
-  Future<bool?>? showSecondaryDisplay(
-      {required int displayId, required String routerName}) async {
+  Future<bool?>? showSecondaryDisplay({
+    required int displayId,
+    required String routerName,
+  }) async {
     return await _displayMethodChannel?.invokeMethod<bool?>(
-        _showPresentation,
-        "{"
-        "\"displayId\": $displayId,"
-        "\"routerName\": \"$routerName\""
-        "}");
+      _showPresentation,
+      jsonEncode(<String, dynamic>{
+        'displayId': displayId,
+        'routerName': routerName,
+      }),
+    );
   }
 
   /// Hides secondary display that is attached to the specified display
@@ -135,10 +153,9 @@ class DisplayManager {
   /// return [Future<bool>] about the status has been display or not
   Future<bool?>? hideSecondaryDisplay({required int displayId}) async {
     return await _displayMethodChannel?.invokeMethod<bool?>(
-        _hidePresentation,
-        "{"
-        "\"displayId\": $displayId"
-        "}");
+      _hidePresentation,
+      jsonEncode(<String, dynamic>{'displayId': displayId}),
+    );
   }
 
   /// Transfer data to a secondary display
@@ -166,7 +183,7 @@ class DisplayManager {
   /// class _SecondaryScreenState extends State<SecondaryScreen> {
   ///   @override
   ///   Widget build(BuildContext context) {
-  ///       return PresentationDisplay(
+  ///       return SecondaryDisplay(
   ///        callback: (argument) {
   ///          Song.fromJson(argument)
   ///       },
@@ -195,7 +212,35 @@ class DisplayManager {
   /// return [Future<bool>] the value to determine whether or not the data has been transferred successfully
   Future<bool?>? transferDataToPresentation(dynamic arguments) async {
     return await _displayMethodChannel?.invokeMethod<bool?>(
-        _transferDataToPresentation, arguments);
+      _transferDataToPresentation,
+      arguments,
+    );
+  }
+
+  /// Transfers data from the secondary Flutter engine to the main Flutter engine.
+  ///
+  /// This is an additive Android API. Existing main-to-secondary communication
+  /// continues to use [transferDataToPresentation] and [SecondaryDisplay].
+  Future<bool?>? transferDataToMain(dynamic arguments) async {
+    return await _dataToMainMethodChannel?.invokeMethod<bool?>(
+      _transferDataToMain,
+      arguments,
+    );
+  }
+
+  /// Registers a callback on the main Flutter engine for data sent by the
+  /// secondary Flutter engine through [transferDataToMain].
+  void listenDataFromPresentationDisplay(PresentationDataCallback callback) {
+    _dataToMainMethodChannel?.setMethodCallHandler((MethodCall call) async {
+      if (call.method == _dataTransfer) {
+        callback(call.arguments);
+      }
+    });
+  }
+
+  /// Removes the callback registered by [listenDataFromPresentationDisplay].
+  void removeDataFromPresentationDisplayListener() {
+    _dataToMainMethodChannel?.setMethodCallHandler(null);
   }
 
   /// Controls whether the secondary display window may take Android key input focus.
@@ -212,7 +257,9 @@ class DisplayManager {
   /// secondary display, false when no secondary display is showing
   Future<bool?>? setSecondaryDisplayFocusable(bool focusable) async {
     return await _displayMethodChannel?.invokeMethod<bool?>(
-        _setSecondaryDisplayFocusable, focusable);
+      _setSecondaryDisplayFocusable,
+      focusable,
+    );
   }
 
   /// Subscribe to the stream to get notifications about connected / disconnected displays

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:presentation_displays/display.dart';
 import 'package:presentation_displays/displays_manager.dart';
@@ -11,10 +13,10 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return MaterialPageRoute(builder: (_) => const SecondaryScreen());
     default:
       return MaterialPageRoute(
-          builder: (_) => Scaffold(
-                body: Center(
-                    child: Text('No route defined for ${settings.name}')),
-              ));
+        builder: (_) => Scaffold(
+          body: Center(child: Text('No route defined for ${settings.name}')),
+        ),
+      );
   }
 }
 
@@ -30,7 +32,7 @@ void secondaryDisplayMain() {
 }
 
 class MySecondApp extends StatelessWidget {
-  const MySecondApp({Key? key}) : super(key: key);
+  const MySecondApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -42,14 +44,11 @@ class MySecondApp extends StatelessWidget {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      onGenerateRoute: generateRoute,
-      initialRoute: '/',
-    );
+    return const MaterialApp(onGenerateRoute: generateRoute, initialRoute: '/');
   }
 }
 
@@ -57,8 +56,7 @@ class Button extends StatelessWidget {
   final String title;
   final VoidCallback? onPressed;
 
-  const Button({Key? key, required this.title, this.onPressed})
-      : super(key: key);
+  const Button({super.key, required this.title, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +64,7 @@ class Button extends StatelessWidget {
       margin: const EdgeInsets.all(4.0),
       child: ElevatedButton(
         onPressed: onPressed,
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 25),
-        ),
+        child: Text(title, style: const TextStyle(fontSize: 25)),
       ),
     );
   }
@@ -77,15 +72,16 @@ class Button extends StatelessWidget {
 
 /// Main Screen
 class DisplayManagerScreen extends StatefulWidget {
-  const DisplayManagerScreen({Key? key}) : super(key: key);
+  const DisplayManagerScreen({super.key});
 
   @override
-  _DisplayManagerScreenState createState() => _DisplayManagerScreenState();
+  State<DisplayManagerScreen> createState() => _DisplayManagerScreenState();
 }
 
 class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
-  DisplayManager displayManager = DisplayManager();
+  final DisplayManager displayManager = DisplayManager();
   List<Display?> displays = [];
+  StreamSubscription<int?>? _displayConnectionSubscription;
 
   final TextEditingController _indexToShareController = TextEditingController();
   final TextEditingController _dataToTransferController =
@@ -95,23 +91,40 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
   String _nameOfId = "";
   final TextEditingController _nameOfIndexController = TextEditingController();
   String _nameOfIndex = "";
+  String _dataFromPresentation = "No data received";
 
   @override
   void initState() {
-    displayManager.connectedDisplaysChangedStream?.listen(
-      (event) {
-        debugPrint("connected displays changed: $event");
-      },
-    );
     super.initState();
+    _displayConnectionSubscription = displayManager
+        .connectedDisplaysChangedStream
+        ?.listen((event) {
+          debugPrint("connected displays changed: $event");
+        });
+    displayManager.listenDataFromPresentationDisplay((dynamic arguments) {
+      if (mounted) {
+        setState(() {
+          _dataFromPresentation = arguments.toString();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _displayConnectionSubscription?.cancel();
+    displayManager.removeDataFromPresentationDisplayListener();
+    _indexToShareController.dispose();
+    _dataToTransferController.dispose();
+    _nameOfIdController.dispose();
+    _nameOfIndexController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Plugin example app'),
-      ),
+      appBar: AppBar(title: const Text('Plugin example app')),
       body: Center(
         child: SingleChildScrollView(
           child: Column(
@@ -122,6 +135,7 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
               _showPresentation(),
               _hidePresentation(),
               _transferData(),
+              _receivedData(),
               _getDisplayeById(),
               _getDisplayByIndex(),
             ],
@@ -137,28 +151,32 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Button(
-            title: "Get Displays",
-            onPressed: () async {
-              final values = await displayManager.getDisplays();
-              displays.clear();
-              setState(() {
-                displays.addAll(values!);
-              });
-            }),
+          title: "Get Displays",
+          onPressed: () async {
+            final values = await displayManager.getDisplays();
+            displays.clear();
+            setState(() {
+              displays.addAll(values!);
+            });
+          },
+        ),
         ListView.builder(
-            scrollDirection: Axis.vertical,
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(8),
-            itemCount: displays.length,
-            itemBuilder: (BuildContext context, int index) {
-              return SizedBox(
-                height: 50,
-                child: Center(
-                    child: Text(
-                        ' ${displays[index]?.displayId} ${displays[index]?.name}')),
-              );
-            }),
-        const Divider()
+          scrollDirection: Axis.vertical,
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(8),
+          itemCount: displays.length,
+          itemBuilder: (BuildContext context, int index) {
+            return SizedBox(
+              height: 50,
+              child: Center(
+                child: Text(
+                  ' ${displays[index]?.displayId} ${displays[index]?.name}',
+                ),
+              ),
+            );
+          },
+        ),
+        const Divider(),
       ],
     );
   }
@@ -179,18 +197,21 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
           ),
         ),
         Button(
-            title: "Show presentation",
-            onPressed: () async {
-              int? displayId = int.tryParse(_indexToShareController.text);
-              if (displayId != null) {
-                for (final display in displays) {
-                  if (display?.displayId == displayId) {
-                    displayManager.showSecondaryDisplay(
-                        displayId: displayId, routerName: "presentation");
-                  }
+          title: "Show presentation",
+          onPressed: () async {
+            int? displayId = int.tryParse(_indexToShareController.text);
+            if (displayId != null) {
+              for (final display in displays) {
+                if (display?.displayId == displayId) {
+                  displayManager.showSecondaryDisplay(
+                    displayId: displayId,
+                    routerName: "presentation",
+                  );
                 }
               }
-            }),
+            }
+          },
+        ),
         const Divider(),
       ],
     );
@@ -212,17 +233,18 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
           ),
         ),
         Button(
-            title: "Hide presentation",
-            onPressed: () async {
-              int? displayId = int.tryParse(_indexToShareController.text);
-              if (displayId != null) {
-                for (final display in displays) {
-                  if (display?.displayId == displayId) {
-                    displayManager.hideSecondaryDisplay(displayId: displayId);
-                  }
+          title: "Hide presentation",
+          onPressed: () async {
+            int? displayId = int.tryParse(_indexToShareController.text);
+            if (displayId != null) {
+              for (final display in displays) {
+                if (display?.displayId == displayId) {
+                  displayManager.hideSecondaryDisplay(displayId: displayId);
                 }
               }
-            }),
+            }
+          },
+        ),
         const Divider(),
       ],
     );
@@ -244,11 +266,22 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
           ),
         ),
         Button(
-            title: "TransferData",
-            onPressed: () async {
-              String data = _dataToTransferController.text;
-              await displayManager.transferDataToPresentation(data);
-            }),
+          title: "TransferData",
+          onPressed: () async {
+            String data = _dataToTransferController.text;
+            await displayManager.transferDataToPresentation(data);
+          },
+        ),
+        const Divider(),
+      ],
+    );
+  }
+
+  Widget _receivedData() {
+    return Column(
+      children: <Widget>[
+        const Text('Data received from presentation'),
+        Text(_dataFromPresentation),
         const Divider(),
       ],
     );
@@ -270,21 +303,20 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
           ),
         ),
         Button(
-            title: "NameByDisplayId",
-            onPressed: () async {
-              int? id = int.tryParse(_nameOfIdController.text);
-              if (id != null) {
-                final value = await displayManager
-                    .getNameByDisplayId(displays[id]?.displayId ?? -1);
-                setState(() {
-                  _nameOfId = value ?? "";
-                });
-              }
-            }),
-        SizedBox(
-          height: 50,
-          child: Center(child: Text(_nameOfId)),
+          title: "NameByDisplayId",
+          onPressed: () async {
+            int? id = int.tryParse(_nameOfIdController.text);
+            if (id != null) {
+              final value = await displayManager.getNameByDisplayId(
+                displays[id]?.displayId ?? -1,
+              );
+              setState(() {
+                _nameOfId = value ?? "";
+              });
+            }
+          },
         ),
+        SizedBox(height: 50, child: Center(child: Text(_nameOfId))),
         const Divider(),
       ],
     );
@@ -306,20 +338,18 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
           ),
         ),
         Button(
-            title: "NameByIndex",
-            onPressed: () async {
-              int? index = int.tryParse(_nameOfIndexController.text);
-              if (index != null) {
-                final value = await displayManager.getNameByIndex(index);
-                setState(() {
-                  _nameOfIndex = value ?? "";
-                });
-              }
-            }),
-        SizedBox(
-          height: 50,
-          child: Center(child: Text(_nameOfIndex)),
+          title: "NameByIndex",
+          onPressed: () async {
+            int? index = int.tryParse(_nameOfIndexController.text);
+            if (index != null) {
+              final value = await displayManager.getNameByIndex(index);
+              setState(() {
+                _nameOfIndex = value ?? "";
+              });
+            }
+          },
         ),
+        SizedBox(height: 50, child: Center(child: Text(_nameOfIndex))),
         const Divider(),
       ],
     );
@@ -328,30 +358,62 @@ class _DisplayManagerScreenState extends State<DisplayManagerScreen> {
 
 /// UI of Presentation display
 class SecondaryScreen extends StatefulWidget {
-  const SecondaryScreen({Key? key}) : super(key: key);
+  const SecondaryScreen({super.key});
 
   @override
-  _SecondaryScreenState createState() => _SecondaryScreenState();
+  State<SecondaryScreen> createState() => _SecondaryScreenState();
 }
 
 class _SecondaryScreenState extends State<SecondaryScreen> {
+  final DisplayManager displayManager = DisplayManager();
+  final TextEditingController _dataToMainController = TextEditingController();
   String value = "init";
+
+  @override
+  void dispose() {
+    _dataToMainController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: SecondaryDisplay(
-      callback: (dynamic argument) {
-        setState(() {
-          value = argument;
-        });
-      },
-      child: Container(
-        color: Colors.white,
-        child: Center(
-          child: Text(value),
+      body: SecondaryDisplay(
+        callback: (dynamic argument) {
+          setState(() {
+            value = argument;
+          });
+        },
+        child: Container(
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text(value),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _dataToMainController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Data to main display',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    displayManager.transferDataToMain(
+                      _dataToMainController.text,
+                    );
+                  },
+                  child: const Text('Send to main display'),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-    ));
+    );
   }
 }

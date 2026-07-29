@@ -1,15 +1,19 @@
+// ignore_for_file: constant_identifier_names
+
 Display displayFromJson(Map<String, dynamic> json) => Display(
-    displayId: json['displayId'],
-    flag: json['flags'],
-    name: json['name'],
-    rotation: json['rotation']);
+  displayId: json['displayId'],
+  flag: json['flags'],
+  name: json['name'],
+  rotation: json['rotation'],
+);
 
 /// for release please check response from invokeMethod
 Display displayReleaseFromJson(Map<String, dynamic> json) => Display(
-    displayId: json['displayId'],
-    flag: json['flags'],
-    name: json['name'],
-    rotation: json['rotation']);
+  displayId: json['displayId'],
+  flag: json['flags'],
+  name: json['name'],
+  rotation: json['rotation'],
+);
 
 /// The default Display id, which is the id of the built-in primary display
 /// assuming there is one.
@@ -147,6 +151,10 @@ class Display {
   /// @return The display's name.
   String? name;
 
-  Display(
-      {required this.displayId, this.flag, required this.name, this.rotation});
+  Display({
+    required this.displayId,
+    this.flag,
+    required this.name,
+    this.rotation,
+  });
 }
